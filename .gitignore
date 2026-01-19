@@ -1,0 +1,22 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+bin/
+lib/
+include/
+
+# Secrets and Environment Variables
+.env
+
+# Playwright browser binaries (optional, usually stored in AppData)
+ms-playwright/
+
+# Editor settings
+.vscode/
+.idea/
