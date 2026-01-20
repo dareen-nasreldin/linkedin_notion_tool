@@ -1,26 +1,28 @@
 # LinkedIn-to-Notion Job Tracker 🚀
 
-**Status:** 🚧 Work in Progress - Core scraper and Notion integration functional.
+**Status:** 🚧 Work in Progress - Bulk search and Notion integration functional.
 
-A Python-based automation tool designed to streamline the internship search process. This utility scrapes LinkedIn job postings and saves key details directly to a private Notion database, bypassing expensive "per-run" automation platforms.
+A Python-based automation tool designed to streamline the internship search process. This utility automates job discovery and tracking by scraping data from LinkedIn and Indeed, saving key details directly to a private Notion database.
 
 ## 📺 Final Result
-This is the central dashboard where all scraped jobs are aggregated for tracking and status management.
+This dashboard aggregates all discovered jobs for centralized tracking and status management.
 <img src="images/notion_board.png" width="600">
+
 ## 🛠️ How It Works
-1. **Dynamic Scraping**: Uses **Playwright** to navigate LinkedIn and extract job titles and company names.
-2. **Notion Integration**: Communicates with the Notion API to manage data entries.
-3. **Fail-Safe Design**: Includes error handling to ensure jobs are added even if secondary features (like duplicate checking) encounter library limitations.
+1. **Hybrid Discovery**: Supports both specific LinkedIn URL scraping via **Playwright** and keyword-based bulk searching via **JobSpy**.
+2. **Notion Integration**: Communicates with the Notion API to automate database entries and management.
+3. **Resilient Architecture**: Implements specialized error handling to bypass SDK-level attribute limitations, ensuring reliable data delivery.
 
 ### Terminal Output
-Evidence of the script successfully scraping a job and pushing it to the Notion database.
-![Terminal Execution](images/terminal_output.png)
+Evidence of the script successfully executing a bulk search and populating the Notion database.
+<img src="images/terminal_output2.png" width="600">
 
 ## 📂 Technical Stack
-* **Language**: Python 3.10+
-* **Scraping**: Playwright (Chromium)
+* **Language**: Python 3.11 (Conda Environment)
+* **Search Engine**: Python-JobSpy (LinkedIn & Indeed Aggregator)
+* **Web Scraping**: Playwright (Chromium)
 * **Database/API**: Notion-Client SDK
-* **Environment Management**: Python-Dotenv & Virtual Environments
+* **Environment Management**: Anaconda & Python-Dotenv
 
 ## ⚙️ Installation & Setup
 
@@ -28,24 +30,20 @@ Evidence of the script successfully scraping a job and pushing it to the Notion 
 1. Create a **Notion Database** with these specific properties:
    * `Name`: Title type
    * `Company`: Select type
-   * `Status`: Select type (Add an option named "To Apply" manually)
+   * `Status`: Select type (Manually add an option named "To Apply")
    * `Link`: URL type
 2. Create an Internal Integration at [Notion Developers](https://www.notion.so/my-integrations).
-3. In your database settings, use the **Connect to** feature to link your integration.
+3. Connect your integration to the database via the **"Connect to"** menu in database settings.
 
-### 2. Local Setup
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd linkedin_notion_tool
-
-# Initialize virtual environment
-python -m venv .venv
-.\.venv\Scripts\activate
+### 2. Local Setup (Conda)
+```powershell
+# Create a stable environment
+conda create -n job_tracker python=3.11 -y
+conda activate job_tracker
 
 # Install dependencies
-pip install -r requirements.txt
-python -m playwright install chromium
+pip install python-jobspy playwright notion-client python-dotenv pandas
+playwright install chromium
 ```
 ### 3. Environment Variables
 Create a .env file (this is ignored by Git for security) and add your keys:
@@ -68,9 +66,9 @@ Run the script and provide a LinkedIn Job URL when prompted:
   - Establish secure connection using `notion-client` and `.env` secrets.
   - Develop `add_to_notion` logic with a fail-safe for library-level attribute errors.
 
-- [ ] **Phase 3: Bulk Search Automation**
-  - Integrate `python-jobspy` to allow keyword-based searches (e.g., "Software Engineer Intern").
-  - Implement a loop to automatically populate the top 10 results into the tracker.
+- [x] **Phase 3: Bulk Search Automation**
+  - Integrated `python-jobspy` 
+  - Implemented a loop to automatically populate the top 10 results into the tracker.
 
 - [ ] **Phase 4: AI Enrichment**
   - Integrate an LLM (Gemini or GPT) to parse job descriptions.
