@@ -17,31 +17,32 @@ const STEPS = [
           href="https://www.notion.so/profile/integrations"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-violet-400 underline hover:text-violet-300"
+          style={{ color: 'var(--accent)' }}
+          className="hover:underline"
         >
           notion.so/profile/integrations
         </a>
-        , click <strong>New connection</strong>, give it any name (e.g. <em>Job Tracker</em>),
-        select your workspace, then click <strong>Create</strong>.
+        , click <strong>New connection</strong>, name it <em>Job Tracker</em>, select your
+        workspace, then click <strong>Create</strong>.
       </>
     ),
     images: [
-      { src: '/setup/integration.png', alt: 'Internal connections page — click Create a new connection' },
-      { src: '/setup/integration2.png', alt: 'New connection form — fill in the name and click Create' },
+      { src: '/setup/integration.png', alt: 'Internal connections page' },
+      { src: '/setup/integration2.png', alt: 'New connection form' },
     ],
   },
   {
     number: 2,
-    title: 'Share a Notion page with your integration',
+    title: 'Share a page with your integration',
     description: (
       <>
-        Open any page in your Notion workspace. Click the <strong>…</strong> menu (top right) →{' '}
-        <strong>Connections</strong> → find <em>Job Tracker</em> and click it to connect. This
-        gives the tool a place to create your database.
+        Open any Notion page, click <strong>…</strong> (top right) → <strong>Connections</strong>{' '}
+        → find <em>Job Tracker</em> and select it. This gives the tool a place to create your
+        database.
       </>
     ),
     images: [
-      { src: '/setup/connection.png', alt: 'Connections menu on a Notion page — select your integration' },
+      { src: '/setup/connection.png', alt: 'Connecting the integration to a page' },
     ],
   },
   {
@@ -49,13 +50,12 @@ const STEPS = [
     title: 'Copy your integration token',
     description: (
       <>
-        Back on the integrations page, open your <em>Job Tracker</em> connection. Under{' '}
-        <strong>Integration token</strong>, click the copy icon next to the hidden token and
-        paste it below.
+        Back on the integrations page, open <em>Job Tracker</em>. Under{' '}
+        <strong>Integration token</strong>, click the copy icon and paste it below.
       </>
     ),
     images: [
-      { src: '/setup/token.png', alt: 'Manage connection page — copy the Access token' },
+      { src: '/setup/token.png', alt: 'Copying the integration token' },
     ],
   },
 ]
@@ -83,76 +83,119 @@ export default function SetupPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center px-4 py-16">
-      <div className="w-full max-w-xl space-y-10">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Connect your Notion</h1>
-          <p className="text-slate-400">One-time setup — takes about 2 minutes</p>
-        </div>
-
-        <div className="space-y-6">
-          {STEPS.map((step) => (
-            <div key={step.number} className="rounded-2xl bg-slate-800/60 border border-slate-700 overflow-hidden">
-              <div className="flex gap-4 p-5">
-                <div className="flex-shrink-0 flex items-start justify-center w-8 h-8 rounded-full bg-violet-600 text-sm font-bold mt-0.5">
-                  {step.number}
-                </div>
-                <div className="space-y-1">
-                  <p className="font-semibold">{step.title}</p>
-                  <p className="text-sm text-slate-400 leading-relaxed">{step.description}</p>
-                </div>
-              </div>
-
-              {step.images.length > 0 && (
-                <div className={`grid gap-2 px-5 pb-5 ${step.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  {step.images.map((img) => (
-                    <div key={img.src} className="rounded-xl overflow-hidden border border-slate-700">
-                      <Image
-                        src={img.src}
-                        alt={img.alt}
-                        width={600}
-                        height={400}
-                        className="w-full h-auto object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="token" className="text-sm font-medium text-slate-300">
-              Integration token
-            </label>
-            <input
-              id="token"
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="ntn_..."
-              required
-              className="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-3 text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-            />
-          </div>
-
-          {error && (
-            <div className="rounded-xl bg-red-900/40 border border-red-700 px-4 py-3 text-sm text-red-300">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading || !token.trim()}
-            className="w-full rounded-xl bg-violet-600 hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-500 transition-colors py-3 font-semibold"
-          >
-            {loading ? 'Setting up your database…' : 'Connect & Set Up'}
-          </button>
-        </form>
+    <div className="max-w-2xl mx-auto px-8 py-12">
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold mb-1" style={{ color: 'var(--text)' }}>
+          Connect Notion
+        </h1>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          One-time setup — takes about 2 minutes
+        </p>
       </div>
-    </main>
+
+      {/* Steps */}
+      <div className="space-y-4 mb-10">
+        {STEPS.map((step) => (
+          <div
+            key={step.number}
+            style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 py-4 flex gap-4">
+              <div
+                style={{
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: 22,
+                  height: 22,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+                className="flex-shrink-0 flex items-center justify-center mt-0.5"
+              >
+                {step.number}
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-1" style={{ color: 'var(--text)' }}>
+                  {step.title}
+                </p>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  {step.description}
+                </p>
+              </div>
+            </div>
+
+            {step.images.length > 0 && (
+              <div
+                style={{ borderTop: '1px solid var(--border)', background: 'var(--sidebar)' }}
+                className={`grid gap-3 px-5 py-4 ${step.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+              >
+                {step.images.map((img) => (
+                  <div
+                    key={img.src}
+                    style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}
+                  >
+                    <Image
+                      src={img.src}
+                      alt={img.alt}
+                      width={560}
+                      height={360}
+                      className="w-full h-auto"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Token form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="token" className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+            Integration token
+          </label>
+          <input
+            id="token"
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="ntn_..."
+            required
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              background: 'var(--input-bg)',
+              color: 'var(--text)',
+            }}
+            className="w-full px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:text-[var(--text-placeholder)]"
+          />
+        </div>
+
+        {error && (
+          <div
+            style={{ background: 'var(--danger-bg)', border: '1px solid #ffc9c9', borderRadius: 'var(--radius)', color: 'var(--danger)' }}
+            className="px-4 py-3 text-sm"
+          >
+            {error}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading || !token.trim()}
+          style={{
+            background: loading || !token.trim() ? 'var(--border)' : 'var(--accent)',
+            color: loading || !token.trim() ? 'var(--text-muted)' : '#fff',
+            borderRadius: 'var(--radius)',
+          }}
+          className="w-full py-2.5 text-sm font-medium transition-colors hover:opacity-90 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Setting up…' : 'Connect & Set Up'}
+        </button>
+      </form>
+    </div>
   )
 }
