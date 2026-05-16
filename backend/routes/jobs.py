@@ -40,7 +40,7 @@ class AddManualRequest(BaseModel):
     database_id: str
 
 
-def _save_to_notion(notion_token: str, database_id: str, job: dict, ai_note: str = ""):
+def _save_to_notion(notion_token: str, database_id: str, job: dict):
     notion = Client(auth=notion_token)
     notion.pages.create(
         parent={"database_id": database_id.strip()},
@@ -49,9 +49,6 @@ def _save_to_notion(notion_token: str, database_id: str, job: dict, ai_note: str
             "Company": {"select": {"name": job["company"].strip()}},
             "Link": {"url": job["url"]},
             "Status": {"select": {"name": "To Apply"}},
-            "AI Note": {
-                "rich_text": [{"text": {"content": ai_note}}] if ai_note else []
-            },
         },
     )
 

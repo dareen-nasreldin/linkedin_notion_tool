@@ -52,6 +52,23 @@ function FilteredCard({ item }: { item: FilteredJob }) {
   )
 }
 
+function ErrorCard({ item }: { item: { job: Job; error: string } }) {
+  return (
+    <div className="rounded-xl bg-red-900/20 border border-red-800 px-4 py-3 space-y-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium truncate">{item.job.title}</p>
+          <p className="text-sm text-slate-400 truncate">{item.job.company}</p>
+        </div>
+        <span className="flex-shrink-0 text-xs bg-red-900 text-red-300 px-2 py-0.5 rounded-full">
+          Error
+        </span>
+      </div>
+      <p className="text-xs text-red-400 font-mono break-all">{item.error}</p>
+    </div>
+  )
+}
+
 export default function SearchPage() {
   const router = useRouter()
   const [ready, setReady] = useState(false)
@@ -183,30 +200,35 @@ export default function SearchPage() {
         {loading && (
           <div className="text-center text-slate-400 text-sm space-y-1">
             <p>Searching LinkedIn &amp; Indeed…</p>
-            <p>Running AI filter…</p>
+            <p>Running filter…</p>
             <p>Saving to Notion…</p>
           </div>
         )}
 
         {results && (
           <div className="space-y-6">
-            <div className="flex gap-4 text-sm">
-              <span className="text-emerald-400 font-medium">
-                {results.saved.length} saved
-              </span>
+            <div className="flex gap-4 text-sm flex-wrap">
+              <span className="text-emerald-400 font-medium">{results.saved.length} saved</span>
               <span className="text-slate-500">·</span>
-              <span className="text-amber-400 font-medium">
-                {results.filtered.length} filtered out
-              </span>
+              <span className="text-amber-400 font-medium">{results.filtered.length} filtered out</span>
               {results.errors.length > 0 && (
                 <>
                   <span className="text-slate-500">·</span>
-                  <span className="text-red-400 font-medium">
-                    {results.errors.length} errors
-                  </span>
+                  <span className="text-red-400 font-medium">{results.errors.length} failed to save</span>
                 </>
               )}
             </div>
+
+            {results.errors.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-widest text-red-500 font-medium">
+                  Failed to save — check your Notion token or database
+                </p>
+                {results.errors.map((item, i) => (
+                  <ErrorCard key={i} item={item} />
+                ))}
+              </div>
+            )}
 
             {results.saved.length > 0 && (
               <div className="space-y-2">
@@ -222,7 +244,7 @@ export default function SearchPage() {
             {results.filtered.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-widest text-slate-500 font-medium">
-                  Filtered out by AI
+                  Filtered out
                 </p>
                 {results.filtered.map((item, i) => (
                   <FilteredCard key={i} item={item} />
@@ -230,9 +252,9 @@ export default function SearchPage() {
               </div>
             )}
 
-            {results.saved.length === 0 && results.filtered.length === 0 && (
+            {results.saved.length === 0 && results.filtered.length === 0 && results.errors.length === 0 && (
               <div className="rounded-xl bg-slate-800/40 border border-slate-700 px-4 py-6 text-center text-slate-400 text-sm">
-                No jobs found for that search. Try a different keyword or location.
+                No jobs found. Try a different keyword or location.
               </div>
             )}
           </div>

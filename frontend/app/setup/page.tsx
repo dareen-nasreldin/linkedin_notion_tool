@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { setupNotion } from '@/lib/api'
 import { saveCredentials } from '@/lib/token'
 
@@ -13,33 +14,49 @@ const STEPS = [
       <>
         Go to{' '}
         <a
-          href="https://www.notion.so/my-integrations"
+          href="https://www.notion.so/profile/integrations"
           target="_blank"
           rel="noopener noreferrer"
           className="text-violet-400 underline hover:text-violet-300"
         >
-          notion.so/my-integrations
+          notion.so/profile/integrations
         </a>
-        , click <strong>New integration</strong>, give it any name (e.g.{' '}
-        <em>Job Tracker</em>), and copy the <strong>Internal Integration Secret</strong>.
+        , click <strong>New connection</strong>, give it any name (e.g. <em>Job Tracker</em>),
+        select your workspace, then click <strong>Create</strong>.
       </>
     ),
+    images: [
+      { src: '/setup/integration.png', alt: 'Internal connections page — click Create a new connection' },
+      { src: '/setup/integration2.png', alt: 'New connection form — fill in the name and click Create' },
+    ],
   },
   {
     number: 2,
-    title: 'Share a Notion page with it',
+    title: 'Share a Notion page with your integration',
     description: (
       <>
-        In your Notion workspace, create a new page (or open an existing one). Click the{' '}
-        <strong>…</strong> menu → <strong>Connections</strong> → find your integration and connect
-        it. This gives the tool a place to create your Job Tracker database.
+        Open any page in your Notion workspace. Click the <strong>…</strong> menu (top right) →{' '}
+        <strong>Connections</strong> → find <em>Job Tracker</em> and click it to connect. This
+        gives the tool a place to create your database.
       </>
     ),
+    images: [
+      { src: '/setup/connection.png', alt: 'Connections menu on a Notion page — select your integration' },
+    ],
   },
   {
     number: 3,
-    title: 'Paste your integration token',
-    description: 'Enter the token you copied in step 1. We\'ll set up your database automatically.',
+    title: 'Copy your integration token',
+    description: (
+      <>
+        Back on the integrations page, open your <em>Job Tracker</em> connection. Under{' '}
+        <strong>Integration token</strong>, click the copy icon next to the hidden token and
+        paste it below.
+      </>
+    ),
+    images: [
+      { src: '/setup/token.png', alt: 'Manage connection page — copy the Access token' },
+    ],
   },
 ]
 
@@ -66,23 +83,41 @@ export default function SetupPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-16">
-      <div className="w-full max-w-lg space-y-10">
+    <main className="flex min-h-screen flex-col items-center px-4 py-16">
+      <div className="w-full max-w-xl space-y-10">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Connect your Notion</h1>
           <p className="text-slate-400">One-time setup — takes about 2 minutes</p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
           {STEPS.map((step) => (
-            <div key={step.number} className="flex gap-4 rounded-xl bg-slate-800/60 border border-slate-700 p-5">
-              <div className="flex-shrink-0 flex items-start justify-center w-8 h-8 rounded-full bg-violet-600 text-sm font-bold mt-0.5">
-                {step.number}
+            <div key={step.number} className="rounded-2xl bg-slate-800/60 border border-slate-700 overflow-hidden">
+              <div className="flex gap-4 p-5">
+                <div className="flex-shrink-0 flex items-start justify-center w-8 h-8 rounded-full bg-violet-600 text-sm font-bold mt-0.5">
+                  {step.number}
+                </div>
+                <div className="space-y-1">
+                  <p className="font-semibold">{step.title}</p>
+                  <p className="text-sm text-slate-400 leading-relaxed">{step.description}</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="font-semibold">{step.title}</p>
-                <p className="text-sm text-slate-400 leading-relaxed">{step.description}</p>
-              </div>
+
+              {step.images.length > 0 && (
+                <div className={`grid gap-2 px-5 pb-5 ${step.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {step.images.map((img) => (
+                    <div key={img.src} className="rounded-xl overflow-hidden border border-slate-700">
+                      <Image
+                        src={img.src}
+                        alt={img.alt}
+                        width={600}
+                        height={400}
+                        className="w-full h-auto object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
