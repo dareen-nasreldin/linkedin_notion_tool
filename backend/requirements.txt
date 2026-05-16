@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 python-jobspy
 notion-client
-anthropic
 beautifulsoup4
 requests
 python-dotenv

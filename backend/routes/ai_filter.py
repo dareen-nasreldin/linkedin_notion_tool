@@ -1,55 +1,101 @@
-import os
-import json
-import anthropic
+import re
+
+# Companies matching these patterns are likely staffing/recruiting agencies.
+# Add more entries here any time you notice spam slipping through.
+RECRUITER_COMPANY_PATTERNS = [
+    r"\bstaffing\b",
+    r"\brecruiting\b",
+    r"\brecruitment\b",
+    r"\btalent\b",
+    r"\bconsulting\b",
+    r"\bconsultants\b",
+    r"\bconfidential\b",
+    r"\bvarious\b",
+    r"\boutsourcing\b",
+    r"\bmanpower\b",
+    r"\bplacement\b",
+    r"\bsourcing\b",
+    r"\bhr partners\b",
+    r"\bhr solutions\b",
+    r"\bworkforce\b",
+    r"\bpersonnel\b",
+    r"\bstaffworks\b",
+    # Known large agencies
+    r"\badecco\b",
+    r"\bkforce\b",
+    r"\broberthalf\b",
+    r"\bhays\b",
+    r"\bmodis\b",
+    r"\binfosys bpm\b",
+    r"\btech mahindra\b",
+]
+
+# Job titles with these words are senior-level roles.
+SENIOR_TITLE_PATTERNS = [
+    r"\bsenior\b",
+    r"\bsr\.\b",
+    r"\blead\b",
+    r"\bprincipal\b",
+    r"\bdirector\b",
+    r"\bmanager\b",
+    r"\bvp\b",
+    r"\bvice president\b",
+    r"\bhead of\b",
+    r"\bchief\b",
+    r"\barchitect\b",
+    r"\bstaff engineer\b",
+    r"\bstaff software\b",
+]
+
+# If the search keyword contains any of these, seniority filtering kicks in.
+JUNIOR_SEARCH_KEYWORDS = [
+    "intern",
+    "internship",
+    "junior",
+    "entry",
+    "entry-level",
+    "co-op",
+    "coop",
+    "new grad",
+    "graduate",
+    "trainee",
+]
+
+
+def _is_recruiter_spam(company: str) -> bool:
+    c = company.lower()
+    return any(re.search(p, c) for p in RECRUITER_COMPANY_PATTERNS)
+
+
+def _is_seniority_mismatch(title: str, keyword: str) -> bool:
+    if not any(k in keyword.lower() for k in JUNIOR_SEARCH_KEYWORDS):
+        return False
+    t = title.lower()
+    return any(re.search(p, t) for p in SENIOR_TITLE_PATTERNS)
 
 
 def filter_jobs(jobs: list[dict], keyword: str) -> list[dict]:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key or not jobs:
-        return [{"job": j, "decision": "keep", "reason": None} for j in jobs]
+    seen: set[tuple[str, str]] = set()
+    result = []
 
-    client = anthropic.Anthropic(api_key=api_key)
+    for job in jobs:
+        title = job.get("title", "")
+        company = job.get("company", "")
 
-    jobs_json = json.dumps(
-        [{"index": i, "title": j["title"], "company": j["company"]} for i, j in enumerate(jobs)],
-        indent=2,
-    )
+        dedup_key = (title.lower().strip(), company.lower().strip())
+        if dedup_key in seen:
+            result.append({"job": job, "decision": "filter", "reason": "DUPLICATE"})
+            continue
+        seen.add(dedup_key)
 
-    prompt = f"""You are a job listing filter. Classify each job as "keep" or "filter".
+        if _is_recruiter_spam(company):
+            result.append({"job": job, "decision": "filter", "reason": "RECRUITER_SPAM"})
+            continue
 
-Search context:
-- Search term: "{keyword}"
+        if _is_seniority_mismatch(title, keyword):
+            result.append({"job": job, "decision": "filter", "reason": "SENIORITY_MISMATCH"})
+            continue
 
-Filter rules:
-1. RECRUITER_SPAM: Posted by a staffing/recruiting agency or has a vague company name (e.g. "Confidential", "Various Clients", names ending in "Staffing", "Recruiting", "Solutions Inc", "HR Partners", "Talent Group")
-2. SENIORITY_MISMATCH: Search contains "intern", "junior", or "entry" but job title is Senior/Lead/Principal/Director/Manager/Head/VP level
-3. DUPLICATE: Same title+company appears more than once in this list
+        result.append({"job": job, "decision": "keep", "reason": None})
 
-Jobs:
-{jobs_json}
-
-Return ONLY a JSON array with no extra text or markdown:
-[{{"index": 0, "decision": "keep", "reason": null}}, {{"index": 1, "decision": "filter", "reason": "RECRUITER_SPAM"}}]"""
-
-    try:
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = message.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        classifications = json.loads(raw.strip())
-        result = []
-        for cls in classifications:
-            idx = cls["index"]
-            if idx < len(jobs):
-                result.append(
-                    {"job": jobs[idx], "decision": cls["decision"], "reason": cls.get("reason")}
-                )
-        return result
-    except Exception:
-        return [{"job": j, "decision": "keep", "reason": None} for j in jobs]
+    return result
