@@ -5,6 +5,7 @@ from jobspy import scrape_jobs
 import requests
 from bs4 import BeautifulSoup
 from .ai_filter import filter_jobs
+from .notion_routes import ensure_schema
 
 router = APIRouter()
 
@@ -40,8 +41,7 @@ class AddManualRequest(BaseModel):
     database_id: str
 
 
-def _save_to_notion(notion_token: str, database_id: str, job: dict):
-    notion = Client(auth=notion_token)
+def _save_to_notion(notion: Client, database_id: str, job: dict):
     notion.pages.create(
         parent={"database_id": database_id.strip()},
         properties={
@@ -80,12 +80,18 @@ def search_jobs(req: SearchRequest):
 
     classified = filter_jobs(raw_jobs, req.keyword)
 
+    notion = Client(auth=req.notion_token)
+    try:
+        ensure_schema(notion, req.database_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Notion schema repair failed: {str(e)}")
+
     saved, filtered, errors = [], [], []
     for item in classified:
         job = item["job"]
         if item["decision"] == "keep":
             try:
-                _save_to_notion(req.notion_token, req.database_id, job)
+                _save_to_notion(notion, req.database_id, job)
                 saved.append(job)
             except Exception as e:
                 errors.append({"job": job, "error": str(e)})
@@ -132,8 +138,10 @@ def add_single_url(req: AddUrlRequest):
 @router.post("/add-manual")
 def add_manual(req: AddManualRequest):
     try:
+        notion = Client(auth=req.notion_token)
+        ensure_schema(notion, req.database_id)
         job = {"title": req.title, "company": req.company, "url": req.url}
-        _save_to_notion(req.notion_token, req.database_id, job)
+        _save_to_notion(notion, req.database_id, job)
         return {"success": True, "job": job}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
