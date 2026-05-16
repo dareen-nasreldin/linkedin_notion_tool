@@ -1,34 +1,11 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from notion_client import Client
+from .notion_api import (
+    validate_token, search_pages, create_database,
+    ensure_schema, REQUIRED_PROPERTIES,
+)
 
 router = APIRouter()
-
-REQUIRED_PROPERTIES = {
-    "Company": {"select": {"options": []}},
-    "Link": {"url": {}},
-    "Status": {
-        "select": {
-            "options": [
-                {"name": "To Apply", "color": "blue"},
-                {"name": "Applied", "color": "yellow"},
-                {"name": "Interviewing", "color": "green"},
-                {"name": "Rejected", "color": "red"},
-                {"name": "Offer", "color": "purple"},
-            ]
-        }
-    },
-}
-
-
-def ensure_schema(notion: Client, database_id: str) -> list[str]:
-    """Add any missing required columns to the database. Returns list of added property names."""
-    db = notion.databases.retrieve(database_id=database_id.strip())
-    existing = db.get("properties", {})
-    missing = {k: v for k, v in REQUIRED_PROPERTIES.items() if k not in existing}
-    if missing:
-        notion.databases.update(database_id=database_id.strip(), properties=missing)
-    return list(missing.keys())
 
 
 class SetupRequest(BaseModel):
@@ -51,12 +28,11 @@ class AddJobRequest(BaseModel):
 @router.post("/notion/setup")
 def setup_notion(req: SetupRequest):
     try:
-        notion = Client(auth=req.notion_token)
-        notion.users.me()  # validate token
+        me = validate_token(req.notion_token)
+        if me.get("object") != "user":
+            raise HTTPException(status_code=400, detail="Invalid Notion token.")
 
-        results = notion.search(filter={"property": "object", "value": "page"})
-        pages = results.get("results", [])
-
+        pages = search_pages(req.notion_token)
         if not pages:
             raise HTTPException(
                 status_code=400,
@@ -70,20 +46,9 @@ def setup_notion(req: SetupRequest):
         title_prop = pages[0].get("properties", {}).get("title", {}).get("title", [])
         parent_title = title_prop[0].get("plain_text", "Untitled") if title_prop else "Untitled"
 
-        db = notion.databases.create(
-            parent={"type": "page_id", "page_id": parent_page_id},
-            title=[{"type": "text", "text": {"content": "Job Tracker"}}],
-            properties={
-                "Name": {"title": {}},
-                **REQUIRED_PROPERTIES,
-            },
-        )
-
+        db = create_database(req.notion_token, parent_page_id)
         database_id = db["id"]
         database_url = db.get("url", f"https://notion.so/{database_id.replace('-', '')}")
-
-        # Ensure schema is correct even if create returned partial state
-        ensure_schema(notion, database_id)
 
         return {
             "success": True,
@@ -99,15 +64,16 @@ def setup_notion(req: SetupRequest):
 
 @router.post("/notion/repair")
 def repair_notion(req: RepairRequest):
-    """Check and repair missing columns in an existing database."""
     try:
-        notion = Client(auth=req.notion_token)
-        notion.users.me()
-        added = ensure_schema(notion, req.database_id)
+        validate_token(req.notion_token)
+        added = ensure_schema(req.notion_token, req.database_id)
         return {
             "success": True,
             "added": added,
-            "message": f"Added {len(added)} missing column(s): {added}" if added else "All columns already present.",
+            "message": (
+                f"Added {len(added)} missing column(s): {added}"
+                if added else "All columns already present."
+            ),
         }
     except HTTPException:
         raise
@@ -118,17 +84,13 @@ def repair_notion(req: RepairRequest):
 @router.post("/notion/add")
 def add_job(req: AddJobRequest):
     try:
-        notion = Client(auth=req.notion_token)
-        ensure_schema(notion, req.database_id)
-        notion.pages.create(
-            parent={"database_id": req.database_id.strip()},
-            properties={
-                "Name": {"title": [{"text": {"content": req.title}}]},
-                "Company": {"select": {"name": req.company.strip()}},
-                "Link": {"url": req.url},
-                "Status": {"select": {"name": "To Apply"}},
-            },
-        )
+        from .notion_api import create_page
+        ensure_schema(req.notion_token, req.database_id)
+        create_page(req.notion_token, req.database_id, {
+            "title": req.title,
+            "company": req.company,
+            "url": req.url,
+        })
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
