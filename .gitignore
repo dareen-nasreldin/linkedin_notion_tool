@@ -7,12 +7,13 @@ __pycache__/
 .venv/
 venv/
 env/
-bin/
-lib/
-include/
+/bin/
+/lib/
+/include/
 
 # Secrets and Environment Variables
 .env
+.env.local
 
 # Playwright browser binaries (optional, usually stored in AppData)
 ms-playwright/
@@ -20,3 +21,12 @@ ms-playwright/
 # Editor settings
 .vscode/
 .idea/
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# OS
+.DS_Store
+Thumbs.db
