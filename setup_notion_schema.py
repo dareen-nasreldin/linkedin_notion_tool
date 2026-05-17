@@ -6,6 +6,7 @@ What this does:
   2. Picks the job tracker (or lets you choose / creates a new one)
   3. Adds any missing columns without touching existing ones
   4. Saves DATABASE_ID to .env automatically
+  5. Reorders columns into a logical job-tracking layout
 
 Usage: python setup_notion_schema.py
 """
@@ -124,6 +125,43 @@ def _find_or_create_database(notion: Client) -> str:
     raise SystemExit(1)
 
 
+# Logical column order for a job-tracking board
+COLUMN_ORDER = ["Name", "Status", "Company", "Location", "Job Type", "Remote", "Date Posted", "Link", "Flagged"]
+
+
+def reorder_columns(notion: Client, db_id: str):
+    """Set column order in the default table view to match COLUMN_ORDER."""
+    db = notion.databases.retrieve(db_id)
+    props = db.get("properties", {})
+
+    # Map name → property ID
+    name_to_id = {name: prop["id"] for name, prop in props.items()}
+
+    # Build ordered list: desired columns first, then any remaining custom ones
+    ordered = []
+    for name in COLUMN_ORDER:
+        if name in name_to_id:
+            ordered.append({"property": name_to_id[name], "visible": True})
+    for name, prop in props.items():
+        if name not in COLUMN_ORDER:
+            ordered.append({"property": prop["id"], "visible": True})
+
+    # Get the database's default view
+    views_resp = notion.request(path="views", method="GET", query={"database_id": db_id})
+    views = views_resp.get("results", [])
+    if not views:
+        print("   ⚠️  No views found — skipping column reorder.")
+        return
+
+    view_id = views[0]["id"]
+    notion.request(
+        path=f"views/{view_id}",
+        method="PATCH",
+        body={"format": {"table_properties": ordered}},
+    )
+    print("✅ Column order set: " + " → ".join(c for c in COLUMN_ORDER if c in name_to_id))
+
+
 def setup_schema():
     load_dotenv(ENV_PATH)
 
@@ -172,6 +210,8 @@ def setup_schema():
         )
         print(f"✅ Added {len(to_add)} missing column(s): {list(to_add.keys())}")
         print("   Your custom columns were left untouched.")
+
+    reorder_columns(notion, db_id)
 
 
 if __name__ == "__main__":
