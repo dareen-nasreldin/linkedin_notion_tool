@@ -1,6 +1,9 @@
 import os
+import sys
 import asyncio
 from dotenv import load_dotenv
+
+sys.stdout.reconfigure(encoding="utf-8")
 from playwright.async_api import async_playwright
 from notion_client import Client
 from jobspy import scrape_jobs
@@ -10,18 +13,21 @@ from filters import flag_jobs
 load_dotenv()
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 DATABASE_ID = os.getenv("DATABASE_ID")
-RESULTS_WANTED = int(os.getenv("RESULTS_WANTED", 20))
+RESULTS_WANTED = int(os.getenv("RESULTS_WANTED", 10))
 HOURS_OLD = int(os.getenv("HOURS_OLD", 72))
-COUNTRY = os.getenv("COUNTRY", "canada")
+COUNTRY = os.getenv("COUNTRY", "usa")
+SITES = [s.strip() for s in os.getenv("SEARCH_SITES", "indeed").split(",")]
 
 # Initialize Notion
 notion = Client(auth=NOTION_TOKEN, notion_version="2022-06-28")
 
 def check_duplicate(url: str) -> bool:
     """Returns True if a job with this URL already exists in Notion."""
-    response = notion.databases.query(
-        database_id=DATABASE_ID.strip(),
-        filter={"property": "Link", "url": {"equals": url}}
+    # notion-client 3.x removed databases.query — use raw request instead
+    response = notion.request(
+        path=f"databases/{DATABASE_ID.strip()}/query",
+        method="POST",
+        body={"filter": {"property": "Link", "url": {"equals": url}}},
     )
     return len(response["results"]) > 0
 
@@ -77,9 +83,9 @@ async def run_bulk_search():
     location = input("Enter location (e.g., Toronto): ")
     job_type = input("Filter job type (internship/full-time/blank=any): ").strip() or None
 
-    print(f"🔍 Searching for top {RESULTS_WANTED} '{keyword}' roles...")
+    print(f"🔍 Searching {SITES} for top {RESULTS_WANTED} '{keyword}' roles — please wait...")
     jobs = scrape_jobs(
-        site_name=["linkedin", "indeed"],
+        site_name=SITES,
         search_term=keyword,
         location=location,
         results_wanted=RESULTS_WANTED,
