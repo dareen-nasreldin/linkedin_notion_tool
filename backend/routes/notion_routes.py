@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from .notion_api import (
-    validate_token, search_pages, create_database,
-    ensure_schema, REQUIRED_PROPERTIES,
+    validate_token, find_or_create_database,
+    ensure_schema, reorder_columns, REQUIRED_PROPERTIES,
 )
 
 router = APIRouter()
@@ -32,29 +32,26 @@ def setup_notion(req: SetupRequest):
         if me.get("object") != "user":
             raise HTTPException(status_code=400, detail="Invalid Notion token.")
 
-        pages = search_pages(req.notion_token)
-        if not pages:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "No Notion pages found. Please create a page in Notion "
-                    "and share it with your integration first."
-                ),
-            )
+        info = find_or_create_database(req.notion_token)
+        database_id = info["id"]
 
-        parent_page_id = pages[0]["id"]
-        title_prop = pages[0].get("properties", {}).get("title", {}).get("title", [])
-        parent_title = title_prop[0].get("plain_text", "Untitled") if title_prop else "Untitled"
+        added = ensure_schema(req.notion_token, database_id)
 
-        db = create_database(req.notion_token, parent_page_id)
-        database_id = db["id"]
-        database_url = db.get("url", f"https://notion.so/{database_id.replace('-', '')}")
+        reordered = False
+        try:
+            reordered = reorder_columns(req.notion_token, database_id)
+        except Exception:
+            pass
 
         return {
             "success": True,
             "database_id": database_id,
-            "database_url": database_url,
-            "parent_page": parent_title,
+            "database_url": info["url"],
+            "database_title": info["title"],
+            "parent_page": info.get("parent_page"),
+            "created": info["created"],
+            "columns_added": added,
+            "columns_reordered": reordered,
         }
     except HTTPException:
         raise
@@ -67,9 +64,17 @@ def repair_notion(req: RepairRequest):
     try:
         validate_token(req.notion_token)
         added = ensure_schema(req.notion_token, req.database_id)
+
+        reordered = False
+        try:
+            reordered = reorder_columns(req.notion_token, req.database_id)
+        except Exception:
+            pass
+
         return {
             "success": True,
             "added": added,
+            "reordered": reordered,
             "message": (
                 f"Added {len(added)} missing column(s): {added}"
                 if added else "All columns already present."
