@@ -15,7 +15,7 @@ HOURS_OLD = int(os.getenv("HOURS_OLD", 72))
 COUNTRY = os.getenv("COUNTRY", "canada")
 
 # Initialize Notion
-notion = Client(auth=NOTION_TOKEN)
+notion = Client(auth=NOTION_TOKEN, notion_version="2022-06-28")
 
 def check_duplicate(url: str) -> bool:
     """Returns True if a job with this URL already exists in Notion."""
