@@ -2,9 +2,19 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from jobspy import scrape_jobs
 import requests
+import math
 from bs4 import BeautifulSoup
 from .ai_filter import filter_jobs
 from .notion_api import ensure_schema, create_page, check_duplicate
+
+
+def _clean(val):
+    """Convert NaN/inf floats from pandas to None so JSON serialization doesn't crash."""
+    if val is None:
+        return None
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return None
+    return val
 
 router = APIRouter()
 
@@ -79,9 +89,9 @@ def search_jobs(req: SearchRequest):
             "company": company,
             "url": url,
             "location": location_str,
-            "job_type": row.get("job_type"),
-            "date_posted": row.get("date_posted"),
-            "is_remote": row.get("is_remote"),
+            "job_type": _clean(row.get("job_type")),
+            "date_posted": _clean(row.get("date_posted")),
+            "is_remote": _clean(row.get("is_remote")),
         })
 
     classified = filter_jobs(raw_jobs, req.keyword)
