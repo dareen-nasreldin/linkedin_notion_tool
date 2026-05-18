@@ -1,7 +1,7 @@
 import re
 
-# Companies matching these patterns are likely staffing/recruiting agencies.
-# Add more entries here any time you notice spam slipping through.
+_STOP_WORDS = {"in", "at", "for", "the", "and", "a", "an", "of", "to", "with"}
+
 RECRUITER_COMPANY_PATTERNS = [
     r"\bstaffing\b",
     r"\brecruiting\b",
@@ -20,7 +20,6 @@ RECRUITER_COMPANY_PATTERNS = [
     r"\bworkforce\b",
     r"\bpersonnel\b",
     r"\bstaffworks\b",
-    # Known large agencies
     r"\badecco\b",
     r"\bkforce\b",
     r"\broberthalf\b",
@@ -30,7 +29,6 @@ RECRUITER_COMPANY_PATTERNS = [
     r"\btech mahindra\b",
 ]
 
-# Job titles with these words are senior-level roles.
 SENIOR_TITLE_PATTERNS = [
     r"\bsenior\b",
     r"\bsr\.\b",
@@ -47,19 +45,25 @@ SENIOR_TITLE_PATTERNS = [
     r"\bstaff software\b",
 ]
 
-# If the search keyword contains any of these, seniority filtering kicks in.
-JUNIOR_SEARCH_KEYWORDS = [
-    "intern",
-    "internship",
-    "junior",
-    "entry",
-    "entry-level",
-    "co-op",
-    "coop",
-    "new grad",
-    "graduate",
-    "trainee",
+JUNIOR_TITLE_PATTERNS = [
+    r"\bintern\b",
+    r"\binternship\b",
+    r"\bjunior\b",
+    r"\bjr\.\b",
 ]
+
+JUNIOR_SEARCH_KEYWORDS = [
+    "intern", "internship", "junior", "entry", "entry-level",
+    "co-op", "coop", "new grad", "graduate", "trainee",
+]
+
+SENIOR_SEARCH_KEYWORDS = [
+    "senior", "sr.", "lead", "staff", "principal",
+]
+
+
+def _keyword_tokens(keyword: str) -> list[str]:
+    return [t for t in keyword.lower().split() if t not in _STOP_WORDS]
 
 
 def _is_recruiter_spam(company: str) -> bool:
@@ -68,13 +72,29 @@ def _is_recruiter_spam(company: str) -> bool:
 
 
 def _is_seniority_mismatch(title: str, keyword: str) -> bool:
-    if not any(k in keyword.lower() for k in JUNIOR_SEARCH_KEYWORDS):
+    kw = keyword.lower()
+    t = title.lower()
+    if any(k in kw for k in JUNIOR_SEARCH_KEYWORDS):
+        return any(re.search(p, t) for p in SENIOR_TITLE_PATTERNS)
+    if any(k in kw for k in SENIOR_SEARCH_KEYWORDS):
+        return any(re.search(p, t) for p in JUNIOR_TITLE_PATTERNS)
+    return False
+
+
+def _is_low_relevance(title: str, keyword: str) -> bool:
+    tokens = _keyword_tokens(keyword)
+    if not tokens:
         return False
     t = title.lower()
-    return any(re.search(p, t) for p in SENIOR_TITLE_PATTERNS)
+    return not any(tok in t for tok in tokens)
 
 
 def filter_jobs(jobs: list[dict], keyword: str) -> list[dict]:
+    """
+    Classify jobs. All jobs are kept and saved to Notion — bad ones get a
+    flagged_reason written to the Flagged column so the user can review them.
+    Recruiter spam is the only case that is outright dropped (decision=filter).
+    """
     seen: set[tuple[str, str]] = set()
     result = []
 
@@ -92,10 +112,18 @@ def filter_jobs(jobs: list[dict], keyword: str) -> list[dict]:
             result.append({"job": job, "decision": "filter", "reason": "RECRUITER_SPAM"})
             continue
 
+        flags = []
         if _is_seniority_mismatch(title, keyword):
-            result.append({"job": job, "decision": "filter", "reason": "SENIORITY_MISMATCH"})
-            continue
+            flags.append("seniority mismatch")
+        if _is_low_relevance(title, keyword):
+            flags.append("low relevance")
 
-        result.append({"job": job, "decision": "keep", "reason": None})
+        flagged_reason = "; ".join(flags)
+        job["flagged_reason"] = flagged_reason
+        result.append({
+            "job": job,
+            "decision": "keep",
+            "reason": flagged_reason or None,
+        })
 
     return result

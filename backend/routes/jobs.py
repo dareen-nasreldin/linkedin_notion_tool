@@ -100,10 +100,14 @@ def search_jobs(req: SearchRequest):
                     skipped.append(job)
                 else:
                     create_page(req.notion_token, req.database_id, job)
-                    saved.append(job)
+                    entry = {"job": {k: v for k, v in job.items() if k != "flagged_reason"}}
+                    if job.get("flagged_reason"):
+                        entry["flagged_reason"] = job["flagged_reason"]
+                    saved.append(entry)
             except Exception as e:
                 errors.append({"job": job, "error": str(e)})
         else:
+            # recruiter spam and exact duplicates — dropped entirely, not saved to Notion
             filtered.append({"job": job, "reason": item["reason"]})
 
     return {"saved": saved, "filtered": filtered, "skipped": skipped, "errors": errors}
