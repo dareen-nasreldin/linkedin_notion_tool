@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+httpx
 python-jobspy
 notion-client
 beautifulsoup4
