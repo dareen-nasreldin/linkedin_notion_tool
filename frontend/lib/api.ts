@@ -22,14 +22,18 @@ export interface Job {
   flagged_reason?: string
 }
 
-export interface FilteredJob {
+export interface ClassifiedJob {
   job: Job
+  decision: 'keep' | 'filter'
   reason: string | null
 }
 
 export interface SearchResult {
+  jobs: ClassifiedJob[]
+}
+
+export interface SaveResult {
   saved: Job[]
-  filtered: FilteredJob[]
   skipped: Job[]
   errors: { job: Job; error: string }[]
 }
@@ -58,10 +62,16 @@ export function searchJobs(params: {
   location: string
   country: string
   results_wanted: number
-  notion_token: string
-  database_id: string
 }): Promise<SearchResult> {
   return post('/api/search', params)
+}
+
+export function saveJobs(params: {
+  jobs: Job[]
+  notion_token: string
+  database_id: string
+}): Promise<SaveResult> {
+  return post('/api/save', params)
 }
 
 export function scrapeUrl(params: {

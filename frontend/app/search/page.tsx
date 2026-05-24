@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { searchJobs, type SearchResult, type Job, type FilteredJob } from '@/lib/api'
+import { searchJobs, saveJobs, type ClassifiedJob, type Job, type SaveResult } from '@/lib/api'
 import { getToken, getDatabaseId, saveLastSearch, getLastSearch, getPresets, savePreset, deletePreset, type SearchPreset } from '@/lib/token'
 
 const COUNTRIES = [
@@ -12,17 +12,17 @@ const COUNTRIES = [
   { value: 'australia', label: 'Australia' },
 ]
 
-const REASON_LABELS: Record<string, string> = {
+const FILTER_REASON_LABELS: Record<string, string> = {
   RECRUITER_SPAM: 'Recruiter spam',
-  SENIORITY_MISMATCH: 'Seniority mismatch',
   DUPLICATE: 'Duplicate',
 }
 
-function Tag({ label, color }: { label: string; color: 'green' | 'amber' | 'red' }) {
+function Tag({ label, color }: { label: string; color: 'green' | 'amber' | 'red' | 'gray' }) {
   const styles = {
     green: { background: 'var(--success-bg)', color: 'var(--success)' },
     amber: { background: 'var(--warning-bg)', color: 'var(--warning)' },
-    red: { background: 'var(--danger-bg)', color: 'var(--danger)' },
+    red:   { background: 'var(--danger-bg)',  color: 'var(--danger)'  },
+    gray:  { background: 'var(--sidebar)',     color: 'var(--text-muted)' },
   }
   return (
     <span
@@ -31,61 +31,6 @@ function Tag({ label, color }: { label: string; color: 'green' | 'amber' | 'red'
     >
       {label}
     </span>
-  )
-}
-
-function SavedRow({ job }: { job: Job }) {
-  return (
-    <a
-      href={job.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{ borderBottom: '1px solid var(--border)' }}
-      className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--sidebar)] transition-colors group"
-    >
-      <span className="text-sm leading-none">📄</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{job.title}</p>
-        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{job.company}</p>
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        {job.flagged_reason && <Tag label="Review" color="amber" />}
-        <Tag label="Saved" color="green" />
-      </div>
-      <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-muted)' }}>↗</span>
-    </a>
-  )
-}
-
-function FilteredRow({ item }: { item: FilteredJob }) {
-  return (
-    <div
-      style={{ borderBottom: '1px solid var(--border)' }}
-      className="flex items-center gap-3 px-4 py-3 opacity-50"
-    >
-      <span className="text-sm leading-none">📄</span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{item.job.title}</p>
-        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{item.job.company}</p>
-      </div>
-      <Tag label={item.reason ? REASON_LABELS[item.reason] ?? item.reason : 'Filtered'} color="amber" />
-    </div>
-  )
-}
-
-function ErrorRow({ item }: { item: { job: Job; error: string } }) {
-  return (
-    <div style={{ borderBottom: '1px solid var(--border)' }} className="px-4 py-3">
-      <div className="flex items-center gap-3">
-        <span className="text-sm leading-none">📄</span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{item.job.title}</p>
-          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{item.job.company}</p>
-        </div>
-        <Tag label="Error" color="red" />
-      </div>
-      <p className="text-xs mt-2 ml-7 font-mono break-all" style={{ color: 'var(--danger)' }}>{item.error}</p>
-    </div>
   )
 }
 
@@ -100,16 +45,27 @@ const inputStyle = {
 export default function SearchPage() {
   const router = useRouter()
   const [ready, setReady] = useState(false)
+
+  // Form
   const [keyword, setKeyword] = useState('')
   const [location, setLocation] = useState('')
   const [country, setCountry] = useState('canada')
   const [count, setCount] = useState('10')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [results, setResults] = useState<SearchResult | null>(null)
+
+  // Presets
   const [presets, setPresets] = useState<SearchPreset[]>([])
   const [showSavePreset, setShowSavePreset] = useState(false)
   const [newPresetName, setNewPresetName] = useState('')
+
+  // Review
+  const [reviewJobs, setReviewJobs] = useState<ClassifiedJob[] | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+
+  // Save
+  const [saving, setSaving] = useState(false)
+  const [saveResult, setSaveResult] = useState<SaveResult | null>(null)
 
   useEffect(() => {
     if (!getToken() || !getDatabaseId()) {
@@ -129,21 +85,19 @@ export default function SearchPage() {
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
-    const token = getToken()
-    const dbId = getDatabaseId()
-    if (!token || !dbId) return
     saveLastSearch({ keyword, location, country, count })
     setLoading(true)
     setError(null)
-    setResults(null)
+    setReviewJobs(null)
+    setSaveResult(null)
     try {
-      const data = await searchJobs({
-        keyword, location, country,
-        results_wanted: parseInt(count),
-        notion_token: token,
-        database_id: dbId,
-      })
-      setResults(data)
+      const data = await searchJobs({ keyword, location, country, results_wanted: parseInt(count) })
+      setReviewJobs(data.jobs)
+      // Pre-select all "keep" jobs
+      const initialSelected = new Set(
+        data.jobs.map((item, i) => item.decision === 'keep' ? i : -1).filter(i => i !== -1)
+      )
+      setSelected(initialSelected)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
     } finally {
@@ -151,14 +105,57 @@ export default function SearchPage() {
     }
   }
 
+  async function handleSave() {
+    const token = getToken()
+    const dbId = getDatabaseId()
+    if (!token || !dbId || !reviewJobs) return
+    const jobsToSave = reviewJobs
+      .filter((_, i) => selected.has(i))
+      .map(item => item.job)
+    if (jobsToSave.length === 0) return
+    setSaving(true)
+    try {
+      const result = await saveJobs({ jobs: jobsToSave, notion_token: token, database_id: dbId })
+      setSaveResult(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function toggleAll(selectAll: boolean) {
+    if (!reviewJobs) return
+    if (selectAll) {
+      setSelected(new Set(reviewJobs.map((_, i) => i)))
+    } else {
+      setSelected(new Set())
+    }
+  }
+
+  function toggleKeepOnly() {
+    if (!reviewJobs) return
+    setSelected(new Set(reviewJobs.map((item, i) => item.decision === 'keep' ? i : -1).filter(i => i !== -1)))
+  }
+
+  function toggleJob(i: number) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(i) ? next.delete(i) : next.add(i)
+      return next
+    })
+  }
+
   if (!ready) return null
+
+  const selectedCount = selected.size
 
   return (
     <div className="max-w-2xl mx-auto px-8 py-12">
       <div className="mb-8">
         <h1 className="text-2xl font-semibold mb-1" style={{ color: 'var(--text)' }}>Search Jobs</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Search LinkedIn &amp; Indeed. Recruiter spam and mismatched roles are filtered automatically.
+          Search Indeed &amp; ZipRecruiter. Review results before saving to Notion.
         </p>
       </div>
 
@@ -206,11 +203,11 @@ export default function SearchPage() {
           <input
             type="text"
             value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            onChange={e => setKeyword(e.target.value)}
             placeholder="e.g. Software Engineer Intern"
             required
             style={inputStyle}
-            className={inputClass + " placeholder:text-[var(--text-placeholder)]"}
+            className={inputClass + ' placeholder:text-[var(--text-placeholder)]'}
           />
         </div>
 
@@ -222,26 +219,19 @@ export default function SearchPage() {
             <input
               type="text"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={e => setLocation(e.target.value)}
               placeholder="e.g. Toronto"
               required
               style={inputStyle}
-              className={inputClass + " placeholder:text-[var(--text-placeholder)]"}
+              className={inputClass + ' placeholder:text-[var(--text-placeholder)]'}
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Country
             </label>
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              style={inputStyle}
-              className={inputClass}
-            >
-              {COUNTRIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
+            <select value={country} onChange={e => setCountry(e.target.value)} style={inputStyle} className={inputClass}>
+              {COUNTRIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
           </div>
         </div>
@@ -250,7 +240,7 @@ export default function SearchPage() {
           <label className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
             Max results
           </label>
-          <select value={count} onChange={(e) => setCount(e.target.value)} style={inputStyle} className={inputClass}>
+          <select value={count} onChange={e => setCount(e.target.value)} style={inputStyle} className={inputClass}>
             <option value="5">5</option>
             <option value="10">10</option>
             <option value="20">20</option>
@@ -281,7 +271,7 @@ export default function SearchPage() {
 
         {loading && (
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-            Searching Indeed &amp; ZipRecruiter, filtering results, saving to Notion…
+            Searching Indeed &amp; ZipRecruiter, filtering results…
           </p>
         )}
 
@@ -336,31 +326,10 @@ export default function SearchPage() {
         </div>
       </form>
 
-      {/* Results */}
-      {results && (
+      {/* Review */}
+      {reviewJobs && !saveResult && (
         <div>
-          <div className="flex items-center gap-4 mb-4">
-            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Results</p>
-            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-              <span style={{ color: 'var(--success)' }}>{results.saved.length} saved</span>
-              <span>·</span>
-              <span>{results.filtered.length} filtered</span>
-              {results.skipped?.length > 0 && (
-                <>
-                  <span>·</span>
-                  <span>{results.skipped.length} already in Notion</span>
-                </>
-              )}
-              {results.errors.length > 0 && (
-                <>
-                  <span>·</span>
-                  <span style={{ color: 'var(--danger)' }}>{results.errors.length} failed</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {results.saved.length === 0 && results.filtered.length === 0 && results.errors.length === 0 ? (
+          {reviewJobs.length === 0 ? (
             <div
               style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-muted)' }}
               className="px-4 py-8 text-center text-sm"
@@ -368,12 +337,169 @@ export default function SearchPage() {
               No jobs found. Try a different keyword or location.
             </div>
           ) : (
-            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-              {results.errors.map((item, i) => <ErrorRow key={i} item={item} />)}
-              {results.saved.map((job, i) => <SavedRow key={i} job={job} />)}
-              {results.filtered.map((item, i) => <FilteredRow key={i} item={item} />)}
-            </div>
+            <>
+              {/* Action bar */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                    {reviewJobs.length} jobs found
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={toggleKeepOnly}
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Reset
+                    </button>
+                    <span style={{ color: 'var(--border)' }}>·</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleAll(true)}
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      All
+                    </button>
+                    <span style={{ color: 'var(--border)' }}>·</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleAll(false)}
+                      className="text-xs hover:underline"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={selectedCount === 0 || saving}
+                  onClick={handleSave}
+                  style={{
+                    background: selectedCount > 0 ? 'var(--accent)' : 'var(--border)',
+                    color: selectedCount > 0 ? '#fff' : 'var(--text-muted)',
+                    borderRadius: 'var(--radius)',
+                  }}
+                  className="px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed hover:opacity-90"
+                >
+                  {saving ? 'Saving…' : `Save ${selectedCount} to Notion`}
+                </button>
+              </div>
+
+              {/* Job list */}
+              <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                {reviewJobs.map((item, i) => {
+                  const isSelected = selected.has(i)
+                  const isFiltered = item.decision === 'filter'
+                  const flagReason = item.job.flagged_reason
+                  const filterLabel = item.reason
+                    ? FILTER_REASON_LABELS[item.reason] ?? item.reason
+                    : null
+
+                  return (
+                    <label
+                      key={i}
+                      style={{
+                        borderBottom: i < reviewJobs.length - 1 ? '1px solid var(--border)' : undefined,
+                        opacity: isFiltered && !isSelected ? 0.45 : 1,
+                        cursor: 'pointer',
+                      }}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--sidebar)] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleJob(i)}
+                        className="shrink-0"
+                        style={{ accentColor: 'var(--accent)', width: 15, height: 15 }}
+                      />
+                      <span className="text-sm leading-none shrink-0">📄</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                          {item.job.title}
+                        </p>
+                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                          {item.job.company}
+                          {item.job.location ? ` · ${item.job.location}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {filterLabel && <Tag label={filterLabel} color="amber" />}
+                        {!filterLabel && flagReason && <Tag label={flagReason} color="amber" />}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+
+              <p className="text-xs mt-2 text-right" style={{ color: 'var(--text-muted)' }}>
+                {selectedCount} of {reviewJobs.length} selected
+              </p>
+            </>
           )}
+        </div>
+      )}
+
+      {/* Save result */}
+      {saveResult && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          <div
+            className="px-4 py-3 flex items-center justify-between"
+            style={{ borderBottom: '1px solid var(--border)', background: 'var(--sidebar)' }}
+          >
+            <div className="flex items-center gap-3 text-sm">
+              <span style={{ color: 'var(--success)' }}>✓ {saveResult.saved.length} saved to Notion</span>
+              {saveResult.skipped.length > 0 && (
+                <span style={{ color: 'var(--text-muted)' }}>· {saveResult.skipped.length} already in Notion</span>
+              )}
+              {saveResult.errors.length > 0 && (
+                <span style={{ color: 'var(--danger)' }}>· {saveResult.errors.length} failed</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setReviewJobs(null); setSaveResult(null) }}
+              className="text-xs hover:underline"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              New search
+            </button>
+          </div>
+
+          {saveResult.saved.map((job, i) => (
+            <a
+              key={i}
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ borderBottom: '1px solid var(--border)' }}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--sidebar)] transition-colors group"
+            >
+              <span className="text-sm leading-none">📄</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{job.title}</p>
+                <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{job.company}</p>
+              </div>
+              <Tag label="Saved" color="green" />
+              <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-muted)' }}>↗</span>
+            </a>
+          ))}
+
+          {saveResult.errors.map((item, i) => (
+            <div key={i} style={{ borderBottom: '1px solid var(--border)' }} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-sm leading-none">📄</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{item.job.title}</p>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{item.job.company}</p>
+                </div>
+                <Tag label="Error" color="red" />
+              </div>
+              <p className="text-xs mt-2 ml-7 font-mono break-all" style={{ color: 'var(--danger)' }}>{item.error}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>

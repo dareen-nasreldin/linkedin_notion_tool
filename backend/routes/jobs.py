@@ -32,6 +32,10 @@ class SearchRequest(BaseModel):
     location: str
     country: str = "canada"
     results_wanted: int = 10
+
+
+class SaveRequest(BaseModel):
+    jobs: list[dict]
     notion_token: str
     database_id: str
 
@@ -52,6 +56,7 @@ class AddManualRequest(BaseModel):
 
 @router.post("/search")
 def search_jobs(req: SearchRequest):
+    """Scrape and classify jobs. Does NOT save to Notion — that happens via /save."""
     try:
         jobs_df = scrape_jobs(
             site_name=["indeed", "zip_recruiter"],
@@ -65,7 +70,7 @@ def search_jobs(req: SearchRequest):
         raise HTTPException(status_code=500, detail=f"Job search failed: {str(e)}")
 
     if jobs_df is None or jobs_df.empty:
-        return {"saved": [], "filtered": [], "errors": []}
+        return {"jobs": []}
 
     raw_jobs = []
     for _, row in jobs_df.iterrows():
@@ -95,29 +100,29 @@ def search_jobs(req: SearchRequest):
         })
 
     classified = filter_jobs(raw_jobs, req.keyword)
+    return {"jobs": classified}
 
+
+@router.post("/save")
+def save_selected_jobs(req: SaveRequest):
+    """Save a user-selected list of jobs to Notion."""
     try:
         ensure_schema(req.notion_token, req.database_id)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Notion schema repair failed: {str(e)}")
 
-    saved, filtered, errors, skipped = [], [], [], []
-    for item in classified:
-        job = item["job"]
-        if item["decision"] == "keep":
-            try:
-                if check_duplicate(req.notion_token, req.database_id, job["url"]):
-                    skipped.append(job)
-                else:
-                    create_page(req.notion_token, req.database_id, job)
-                    saved.append({k: v for k, v in job.items()})
-            except Exception as e:
-                errors.append({"job": job, "error": str(e)})
-        else:
-            # recruiter spam and exact duplicates — dropped entirely, not saved to Notion
-            filtered.append({"job": job, "reason": item["reason"]})
+    saved, skipped, errors = [], [], []
+    for job in req.jobs:
+        try:
+            if check_duplicate(req.notion_token, req.database_id, job["url"]):
+                skipped.append(job)
+            else:
+                create_page(req.notion_token, req.database_id, job)
+                saved.append(job)
+        except Exception as e:
+            errors.append({"job": job, "error": str(e)})
 
-    return {"saved": saved, "filtered": filtered, "skipped": skipped, "errors": errors}
+    return {"saved": saved, "skipped": skipped, "errors": errors}
 
 
 @router.post("/add-url")
