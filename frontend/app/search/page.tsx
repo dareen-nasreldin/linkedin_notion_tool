@@ -48,7 +48,10 @@ function SavedRow({ job }: { job: Job }) {
         <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{job.title}</p>
         <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{job.company}</p>
       </div>
-      <Tag label="Saved" color="green" />
+      <div className="flex items-center gap-1.5 shrink-0">
+        {job.flagged_reason && <Tag label="Review" color="amber" />}
+        <Tag label="Saved" color="green" />
+      </div>
       <span className="text-xs opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-muted)' }}>↗</span>
     </a>
   )
@@ -278,7 +281,7 @@ export default function SearchPage() {
 
         {loading && (
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-            Searching LinkedIn &amp; Indeed, filtering results, saving to Notion…
+            Searching Indeed &amp; ZipRecruiter, filtering results, saving to Notion…
           </p>
         )}
 
@@ -342,6 +345,12 @@ export default function SearchPage() {
               <span style={{ color: 'var(--success)' }}>{results.saved.length} saved</span>
               <span>·</span>
               <span>{results.filtered.length} filtered</span>
+              {results.skipped?.length > 0 && (
+                <>
+                  <span>·</span>
+                  <span>{results.skipped.length} already in Notion</span>
+                </>
+              )}
               {results.errors.length > 0 && (
                 <>
                   <span>·</span>

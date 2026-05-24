@@ -54,11 +54,11 @@ class AddManualRequest(BaseModel):
 def search_jobs(req: SearchRequest):
     try:
         jobs_df = scrape_jobs(
-            site_name=["indeed"],
+            site_name=["indeed", "zip_recruiter"],
             search_term=req.keyword,
             location=req.location,
             results_wanted=req.results_wanted,
-            hours_old=72,
+            hours_old=168,
             country_selection=req.country,
         )
     except Exception as e:
@@ -110,10 +110,7 @@ def search_jobs(req: SearchRequest):
                     skipped.append(job)
                 else:
                     create_page(req.notion_token, req.database_id, job)
-                    entry = {"job": {k: v for k, v in job.items() if k != "flagged_reason"}}
-                    if job.get("flagged_reason"):
-                        entry["flagged_reason"] = job["flagged_reason"]
-                    saved.append(entry)
+                    saved.append({k: v for k, v in job.items()})
             except Exception as e:
                 errors.append({"job": job, "error": str(e)})
         else:

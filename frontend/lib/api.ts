@@ -15,6 +15,11 @@ export interface Job {
   title: string
   company: string
   url: string
+  location?: string | null
+  job_type?: string | null
+  date_posted?: string | null
+  is_remote?: boolean | null
+  flagged_reason?: string
 }
 
 export interface FilteredJob {
@@ -25,6 +30,7 @@ export interface FilteredJob {
 export interface SearchResult {
   saved: Job[]
   filtered: FilteredJob[]
+  skipped: Job[]
   errors: { job: Job; error: string }[]
 }
 
