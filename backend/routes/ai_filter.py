@@ -3,7 +3,7 @@ import re
 _STOP_WORDS = {"in", "at", "for", "the", "and", "a", "an", "of", "to", "with"}
 
 RECRUITER_COMPANY_PATTERNS = [
-    r"\bstaffing\b",
+    r"staffing",          # catches TechStaffing, Staffing Inc, etc.
     r"\brecruiting\b",
     r"\brecruitment\b",
     r"\btalent\b",
@@ -22,7 +22,7 @@ RECRUITER_COMPANY_PATTERNS = [
     r"\bstaffworks\b",
     r"\badecco\b",
     r"\bkforce\b",
-    r"\broberthalf\b",
+    r"robert\s+half",     # catches "Robert Half" (space between words)
     r"\bhays\b",
     r"\bmodis\b",
     r"\binfosys bpm\b",
