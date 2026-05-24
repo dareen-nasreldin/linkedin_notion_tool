@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #141420;
+      color: #e0e0e0;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 14px;
+      border-bottom: 1px solid #252538;
+    }
+    .header-logo { font-size: 15px; }
+    .header-title { font-size: 13px; font-weight: 600; flex: 1; }
+    .header-gear {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #555;
+      font-size: 13px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .header-gear:hover { color: #aaa; }
+
+    /* ── Views ──────────────────────────────────────────────── */
+    .view { padding: 14px; display: none; }
+    .view.active { display: block; }
+
+    /* ── Setup view ─────────────────────────────────────────── */
+    .setup-title { font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .setup-desc {
+      font-size: 11px;
+      color: #777;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .setup-desc strong { color: #c084fc; }
+    .textarea {
+      width: 100%;
+      background: #0d0d1a;
+      border: 1px solid #252538;
+      border-radius: 6px;
+      color: #ccc;
+      font-size: 10px;
+      padding: 8px;
+      resize: none;
+      height: 58px;
+      font-family: monospace;
+      line-height: 1.4;
+    }
+    .textarea:focus { outline: none; border-color: #c084fc; }
+    .setup-error {
+      font-size: 11px;
+      color: #f87171;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .btn {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+      margin-top: 8px;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.85; }
+    .btn:disabled { opacity: 0.5; cursor: default; }
+    .btn-primary  { background: #c084fc; color: #141420; }
+    .btn-success  { background: #4ade80; color: #141420; }
+
+    /* ── Job view ───────────────────────────────────────────── */
+    .job-title    { font-size: 13px; font-weight: 600; margin-bottom: 3px; line-height: 1.35; }
+    .job-company  { font-size: 12px; color: #c084fc; margin-bottom: 2px; }
+    .job-location { font-size: 11px; color: #666; margin-bottom: 12px; }
+
+    /* ── Status line ────────────────────────────────────────── */
+    .status { font-size: 11px; text-align: center; margin-top: 7px; min-height: 16px; }
+    .status.success { color: #4ade80; }
+    .status.skip    { color: #888; }
+    .status.error   { color: #f87171; }
+    .status.loading { color: #888; }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 18px 10px 14px;
+      color: #666;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .empty-icon { font-size: 26px; margin-bottom: 8px; }
+
+    /* ── Links ──────────────────────────────────────────────── */
+    .link-small {
+      display: block;
+      text-align: center;
+      font-size: 11px;
+      color: #c084fc;
+      margin-top: 10px;
+      text-decoration: none;
+    }
+    .link-small:hover { text-decoration: underline; }
+
+    /* ── Spinner ────────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border: 2px solid #333;
+      border-top-color: #c084fc;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-logo">💼</span>
+    <span class="header-title">NotionJobs</span>
+    <button class="header-gear" id="gearBtn" title="Settings">⚙️</button>
+  </div>
+
+  <!-- View: Setup / not connected -->
+  <div class="view" id="viewSetup">
+    <div class="setup-title">Connect to Notion</div>
+    <div class="setup-desc">
+      On <strong>notionjobs.vercel.app</strong>, click<br>
+      <strong>"Export for extension"</strong>, then paste below.
+    </div>
+    <textarea
+      class="textarea"
+      id="credInput"
+      placeholder='{"notion_token":"ntn_...","database_id":"..."}'
+    ></textarea>
+    <div class="setup-error" id="setupError"></div>
+    <button class="btn btn-primary" id="connectBtn">Connect</button>
+    <a class="link-small" href="https://notionjobs.vercel.app" target="_blank">
+      Open NotionJobs →
+    </a>
+  </div>
+
+  <!-- View: Job found, ready to save -->
+  <div class="view" id="viewJob">
+    <div class="job-title"    id="jobTitle"></div>
+    <div class="job-company"  id="jobCompany"></div>
+    <div class="job-location" id="jobLocation"></div>
+    <button class="btn btn-primary" id="saveBtn">Save to Notion</button>
+    <div class="status" id="saveStatus"></div>
+  </div>
+
+  <!-- View: Not on a LinkedIn jobs page -->
+  <div class="view active" id="viewEmpty">
+    <div class="empty">
+      <div class="empty-icon">🔍</div>
+      Open a LinkedIn job listing<br>to save it to Notion.
+      <a class="link-small" href="https://www.linkedin.com/jobs/" target="_blank">
+        Browse LinkedIn Jobs →
+      </a>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -15,7 +15,8 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied]         = useState(false)
+  const [exportCopied, setExportCopied] = useState(false)
 
   function handleReset() {
     clearCredentials()
@@ -30,6 +31,17 @@ export default function Sidebar() {
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function handleExportForExtension() {
+    const t = getToken()
+    const d = getDatabaseId()
+    if (!t || !d) return
+    const payload = JSON.stringify({ notion_token: t, database_id: d })
+    navigator.clipboard.writeText(payload).then(() => {
+      setExportCopied(true)
+      setTimeout(() => setExportCopied(false), 2000)
     })
   }
 
@@ -84,6 +96,14 @@ export default function Sidebar() {
           >
             <span className="text-base leading-none">{copied ? '✓' : '🔗'}</span>
             <span>{copied ? 'Copied!' : 'Copy setup link'}</span>
+          </button>
+          <button
+            onClick={handleExportForExtension}
+            style={{ color: exportCopied ? 'var(--success)' : 'var(--text-muted)', borderRadius: 'var(--radius)' }}
+            className="flex items-center gap-2 w-full px-2 py-1.5 text-sm transition-colors hover:bg-[var(--sidebar-hover)] hover:!text-[var(--text)]"
+          >
+            <span className="text-base leading-none">{exportCopied ? '✓' : '🧩'}</span>
+            <span>{exportCopied ? 'Copied!' : 'Export for extension'}</span>
           </button>
           <button
             onClick={handleReset}
