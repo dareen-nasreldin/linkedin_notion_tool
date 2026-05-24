@@ -193,6 +193,20 @@ def check_duplicate(token: str, database_id: str, url: str) -> bool:
     return len(result.get("results", [])) > 0
 
 
+_JOB_TYPE_MAP = {
+    "fulltime": "Full-time", "full-time": "Full-time", "full time": "Full-time",
+    "parttime": "Part-time", "part-time": "Part-time", "part time": "Part-time",
+    "internship": "Internship", "intern": "Internship",
+    "contract": "Contract", "contractor": "Contract",
+    "temporary": "Temporary", "temp": "Temporary",
+}
+
+
+def _normalize_job_type(raw: str) -> str | None:
+    first = raw.split(",")[0].strip().lower()
+    return _JOB_TYPE_MAP.get(first)
+
+
 def create_page(token: str, database_id: str, job: dict) -> dict:
     props = {
         "Name":    {"title":  [{"text": {"content": job["title"]}}]},
@@ -203,7 +217,9 @@ def create_page(token: str, database_id: str, job: dict) -> dict:
     if job.get("location"):
         props["Location"] = {"rich_text": [{"text": {"content": str(job["location"])}}]}
     if job.get("job_type"):
-        props["Job Type"] = {"select": {"name": str(job["job_type"]).capitalize()}}
+        normalized = _normalize_job_type(str(job["job_type"]))
+        if normalized:
+            props["Job Type"] = {"select": {"name": normalized}}
     if job.get("date_posted"):
         props["Date Posted"] = {"date": {"start": str(job["date_posted"])[:10]}}
     if job.get("is_remote") is not None:
