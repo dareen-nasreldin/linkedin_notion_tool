@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { setupNotion } from '@/lib/api'
@@ -65,6 +65,16 @@ export default function SetupPage() {
   const [token, setToken] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const t = params.get('token')
+    const d = params.get('db')
+    if (t && d) {
+      saveCredentials(t, d)
+      router.push('/')
+    }
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

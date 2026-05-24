@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { clearCredentials } from '@/lib/token'
+import { clearCredentials, getToken, getDatabaseId } from '@/lib/token'
 
 const NAV = [
   { href: '/', label: 'Home', icon: '🏠' },
@@ -14,9 +15,22 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
+  const [copied, setCopied] = useState(false)
+
   function handleReset() {
     clearCredentials()
     router.push('/setup')
+  }
+
+  function handleCopySetupLink() {
+    const t = getToken()
+    const d = getDatabaseId()
+    if (!t || !d) return
+    const url = `https://notionjobs.vercel.app/setup?token=${encodeURIComponent(t)}&db=${encodeURIComponent(d)}`
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
   }
 
   return (
@@ -62,7 +76,15 @@ export default function Sidebar() {
         </nav>
 
         {/* Settings */}
-        <div style={{ borderTop: '1px solid var(--border)' }} className="p-1.5">
+        <div style={{ borderTop: '1px solid var(--border)' }} className="p-1.5 space-y-px">
+          <button
+            onClick={handleCopySetupLink}
+            style={{ color: copied ? 'var(--success)' : 'var(--text-muted)', borderRadius: 'var(--radius)' }}
+            className="flex items-center gap-2 w-full px-2 py-1.5 text-sm transition-colors hover:bg-[var(--sidebar-hover)] hover:!text-[var(--text)]"
+          >
+            <span className="text-base leading-none">{copied ? '✓' : '🔗'}</span>
+            <span>{copied ? 'Copied!' : 'Copy setup link'}</span>
+          </button>
           <button
             onClick={handleReset}
             style={{ color: 'var(--text-muted)', borderRadius: 'var(--radius)' }}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { searchJobs, type SearchResult, type Job, type FilteredJob } from '@/lib/api'
-import { getToken, getDatabaseId } from '@/lib/token'
+import { getToken, getDatabaseId, saveLastSearch, getLastSearch, getPresets, savePreset, deletePreset, type SearchPreset } from '@/lib/token'
 
 const COUNTRIES = [
   { value: 'canada', label: 'Canada' },
@@ -104,12 +104,23 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<SearchResult | null>(null)
+  const [presets, setPresets] = useState<SearchPreset[]>([])
+  const [showSavePreset, setShowSavePreset] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
 
   useEffect(() => {
     if (!getToken() || !getDatabaseId()) {
       router.push('/setup')
     } else {
       setReady(true)
+      const last = getLastSearch()
+      if (last) {
+        setKeyword(last.keyword)
+        setLocation(last.location)
+        setCountry(last.country)
+        setCount(last.count)
+      }
+      setPresets(getPresets())
     }
   }, [router])
 
@@ -118,6 +129,7 @@ export default function SearchPage() {
     const token = getToken()
     const dbId = getDatabaseId()
     if (!token || !dbId) return
+    saveLastSearch({ keyword, location, country, count })
     setLoading(true)
     setError(null)
     setResults(null)
@@ -146,6 +158,37 @@ export default function SearchPage() {
           Search LinkedIn &amp; Indeed. Recruiter spam and mismatched roles are filtered automatically.
         </p>
       </div>
+
+      {/* Presets */}
+      {presets.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {presets.map(p => (
+            <div
+              key={p.name}
+              className="flex items-center"
+              style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
+            >
+              <button
+                type="button"
+                onClick={() => { setKeyword(p.keyword); setLocation(p.location); setCountry(p.country); setCount(p.count) }}
+                className="px-3 py-1 text-sm hover:bg-[var(--sidebar-hover)] transition-colors"
+                style={{ color: 'var(--text)', borderRadius: 'var(--radius) 0 0 var(--radius)' }}
+              >
+                {p.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => { deletePreset(p.name); setPresets(getPresets()) }}
+                className="px-1.5 py-1 text-xs hover:bg-[var(--sidebar-hover)] transition-colors"
+                style={{ color: 'var(--text-muted)', borderRadius: '0 var(--radius) var(--radius) 0' }}
+                aria-label={`Delete preset ${p.name}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Form */}
       <form
@@ -238,6 +281,56 @@ export default function SearchPage() {
             Searching LinkedIn &amp; Indeed, filtering results, saving to Notion…
           </p>
         )}
+
+        <div className="pt-1">
+          {!showSavePreset ? (
+            <button
+              type="button"
+              onClick={() => setShowSavePreset(true)}
+              className="text-xs hover:underline"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              + Save as preset
+            </button>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newPresetName}
+                onChange={e => setNewPresetName(e.target.value)}
+                placeholder="Preset name (e.g. Toronto Intern)"
+                style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--input-bg)', color: 'var(--text)' }}
+                className="flex-1 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:text-[var(--text-placeholder)]"
+              />
+              <button
+                type="button"
+                disabled={!newPresetName.trim()}
+                onClick={() => {
+                  savePreset({ name: newPresetName.trim(), keyword, location, country, count })
+                  setPresets(getPresets())
+                  setNewPresetName('')
+                  setShowSavePreset(false)
+                }}
+                className="px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed transition-colors"
+                style={{
+                  background: newPresetName.trim() ? 'var(--accent)' : 'var(--border)',
+                  color: newPresetName.trim() ? '#fff' : 'var(--text-muted)',
+                  borderRadius: 'var(--radius)',
+                }}
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSavePreset(false); setNewPresetName('') }}
+                className="px-2 py-1.5 text-sm hover:bg-[var(--sidebar)] transition-colors"
+                style={{ color: 'var(--text-muted)', borderRadius: 'var(--radius)' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </form>
 
       {/* Results */}
