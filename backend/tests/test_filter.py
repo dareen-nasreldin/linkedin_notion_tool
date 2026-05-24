@@ -17,22 +17,24 @@ def job(title, company, url="https://example.com/job"):
 # ── _is_recruiter_spam ────────────────────────────────────────────────────────
 
 class TestRecruiterSpam:
-    def test_staffing_in_name(self):
-        assert _is_recruiter_spam("TechStaffing Inc") is True
-
-    def test_recruiting_in_name(self):
-        assert _is_recruiter_spam("Acme Recruiting") is True
-
-    def test_known_agency(self):
-        assert _is_recruiter_spam("Hays") is True
-        assert _is_recruiter_spam("Adecco") is True
-        assert _is_recruiter_spam("Robert Half") is True
-
-    def test_talent_in_name(self):
-        assert _is_recruiter_spam("Global Talent Solutions") is True
-
-    def test_confidential(self):
-        assert _is_recruiter_spam("Confidential") is True
+    @pytest.mark.parametrize("company", [
+        # standalone / space-separated forms
+        "Recruiting Solutions Ltd", "Global Recruitment Inc", "Top Talent",
+        "IT Consulting Group", "HR Consultants LLC", "Confidential",
+        "Various Companies", "Tech Outsourcing Co", "Manpower Group",
+        "Global Placement", "Talent Sourcing LLC", "HR Partners",
+        "HR Solutions", "Global Workforce", "Tech Personnel", "StaffWorks",
+        "Adecco", "Kforce", "Robert Half", "Hays", "Modis",
+        "Infosys BPM", "Tech Mahindra",
+        "Kelly Services", "Michael Page", "Volt", "Hudson Global",
+        # compound forms — previously silently missed due to \b bug
+        "TechStaffing Inc", "TechRecruiting Inc", "GlobalRecruitment",
+        "TopTalent", "TechConsulting", "ITConsultants", "TechOutsourcing",
+        "TalentSourcing", "HRPartners", "HRSolutions",
+        "GlobalWorkforce", "TechPersonnel", "InfosysBPM", "TechMahindra",
+    ])
+    def test_all_spam_patterns_caught(self, company):
+        assert _is_recruiter_spam(company) is True
 
     def test_real_companies_pass(self):
         assert _is_recruiter_spam("Google") is False
