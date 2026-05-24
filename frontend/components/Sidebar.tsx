@@ -9,6 +9,7 @@ const NAV = [
   { href: '/', label: 'Home', icon: '🏠' },
   { href: '/search', label: 'Search Jobs', icon: '🔍' },
   { href: '/add-url', label: 'Add a Job', icon: '🔗' },
+  { href: '/extension', label: 'Get Extension', icon: '🧩' },
 ]
 
 export default function Sidebar() {
